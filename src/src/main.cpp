@@ -1,11 +1,18 @@
 /**
- * @file main.cpp
- * @brief: Program that reads temperature, humidity and soil moisture values from sensors and sends them to a server
+ * Project Name: PlantKeeper
  *
- * @author: Rafael Dousse
- * @date 23.08.2024
- * @version 1.0
+ * @created 23.08.2024
+ * @file  main.cpp
+ * @version 1.0.0
+ * @see https://github.com/Plant-keeper
+ *
+ * @authors
+ *   - Rafael Dousse
+ *   - Eva Ray
+ *   - Quentin Surdez
+ *   - Rachel Tranchida
  */
+
 #include <Arduino.h>
 #include <WiFiNINA.h>
 #include <ArduinoHttpServer.h>
@@ -13,15 +20,20 @@
 #include "arduino_secrets.h"
 #include <vector>
 #include "webpages.h"
+#include "DHT.h"
+#include "ArduinoJson.h"
+
 // To check how it works, if time allows
 /* #include <WiFiUdp.h>
 #include <ArduinoMDNS.h> */
 
 // Function prototypes
+void listNetworks(std::vector<const char *> &networks);
 void startAccessPoint();
 void handleConfigRequest();
 void connectToWiFi();
 void printWEB();
+void readSensors();
 
 // Global variables
 char ssid[32];
@@ -32,11 +44,25 @@ const char *ssidArduino = "Arduino_Config";
 const char *passArduino = "password";
 
 WiFiServer server(80); // Server socket
-//WiFiWebServer server(80); 
+// WiFiWebServer server(80);
 /* WiFiClient client; */
 int status = WL_IDLE_STATUS;
 WiFiClient client;
 std::vector<const char *> networks;
+
+// Instantiate DHT and JSon object
+DHT dht(2, DHT11);
+JsonDocument doc;
+// Global variables used in loop
+int val1;
+int val2;
+int percentage1;
+int percentage2;
+float h;
+float t;
+
+const int dry = 1023;
+const int wet = 700;
 
 /* WiFiUDP udp;
 MDNS mdns(udp);
@@ -55,48 +81,6 @@ MDNS mdns(udp);
   }
 } */
 
-void listNetworks()
-{
-    // scan for nearby networks:
-    Serial.println("** Scan Networks **");
-
-    int numSsid = WiFi.scanNetworks();
-    if (numSsid == -1)
-    {
-        Serial.println("Couldn't get a WiFi connection");
-        while (true)
-            ;
-    }
-
-    // print the list of networks seen:
-    Serial.print("number of available networks:");
-    Serial.println(numSsid);
-
-    // print the network number and name for each network found:
-    for (int thisNet = 0; thisNet < numSsid; thisNet++)
-    {
-        networks.push_back(WiFi.SSID(thisNet));
-    }
-
-}
-
-/* void handlePostRequest() {
-    if (server.hasArg("ssid") && server.hasArg("pass")) {
-        String ssid = server.arg("ssid");
-        String password = server.arg("pass");
-
-        Serial.print("SSID: ");
-        Serial.println(ssid);
-        Serial.print("Password: ");
-        Serial.println(password);
-
-        // Traitez les informations du SSID et du mot de passe ici
-        server.send(200, "text/html", "<h1>Configuration Saved</h1>");
-    } else {
-        server.send(400, "text/html", "Invalid Request");
-    }
-} */
-
 void setup()
 {
 
@@ -106,7 +90,7 @@ void setup()
 
     if (WiFi.status() != WL_CONNECTED)
     {
-        listNetworks();
+        listNetworks(networks);
         startAccessPoint(); // Start in AP mode to configure WiFi
     }
     else
@@ -135,6 +119,7 @@ void loop()
         }
       }
        mdns.run(); */
+
     if (needsWiFiConfig)
     {
         client = server.available();
@@ -151,6 +136,32 @@ void loop()
             Serial.println("Client available... so printweb");
             printWEB();
         }
+    }
+}
+
+//--------------------------------------------WEB SERVER FUNCTIONS--------------------------------------------
+
+void listNetworks(std::vector<const char *> &network)
+{
+    // scan for nearby networks:
+    Serial.println("** Scan Networks **");
+
+    int numSsid = WiFi.scanNetworks();
+    if (numSsid == -1)
+    {
+        Serial.println("Couldn't get a WiFi connection");
+        while (true)
+            ;
+    }
+
+    // print the list of networks seen:
+    Serial.print("number of available networks:");
+    Serial.println(numSsid);
+
+    // print the network number and name for each network found:
+    for (int thisNet = 0; thisNet < numSsid; thisNet++)
+    {
+        network.push_back(WiFi.SSID(thisNet));
     }
 }
 
@@ -206,7 +217,7 @@ void startAccessPoint()
 /**
  * Function to handle the configuration request and extract SSID and Password
  */
- void handleConfigRequest()
+void handleConfigRequest()
 {
     Serial.println("Handling Config Request...");
     String header = "";
@@ -251,6 +262,7 @@ void startAccessPoint()
                 }
                 else if (header.length() == 0)
                 {
+                   
                     Serial.println("Sending Config Page...");
                     client.println("HTTP/1.1 200 OK");
                     client.println("Content-type:text/html");
@@ -259,13 +271,15 @@ void startAccessPoint()
                     client.println(generateConfigPage(networks));
                     client.println();
                     break;
-                } else if (header.indexOf("POST /submit") >= 0) 
+                }
+                else if (header.indexOf("POST /submit") >= 0)
                 {
                     Serial.println("POST request received!");
 
                     // Read the POST request body
                     String postBody = "";
-                    while(client.available()) {
+                    while (client.available())
+                    {
                         postBody += (char)client.read();
                     }
 
@@ -291,7 +305,6 @@ void startAccessPoint()
                     Serial.println("Sending Success Page...");
                     delay(1000);
 
-                    
                     break;
                 }
                 else
@@ -304,7 +317,6 @@ void startAccessPoint()
                 header += c; // add it to the end of the currentLine
                 tmpRequest += c;
             }
-
         }
     }
     Serial.print("Header is : ");
@@ -316,68 +328,7 @@ void startAccessPoint()
     }
 
     client.stop();
-} 
-
-/* 
-void handleConfigRequest() {
-    Serial.println("Handling Config Request...");
-    String header = "";
-    String body = "";
-    bool isPost = false;
-    bool currentLineIsBlank = true;
-
-    WiFiClient client = server.available();
-
-    while (client.connected()) {
-        if (client.available()) {
-            char c = client.read();
-            header += c;
-
-            if (c == '\n' && currentLineIsBlank) {
-                if (header.startsWith("POST /submit")) {
-                    isPost = true;
-                }
-                header = "";  // Clear header for next part
-            }
-            if (c == '\n' && isPost) {
-                body = client.readString();  // Read the POST body after headers
-                break;
-            }
-            if (c == '\n') {
-                currentLineIsBlank = true;
-            } else if (c != '\r') {
-                currentLineIsBlank = false;
-            }
-        }
-    }
-
-    if (isPost) {
-        // Parse body to extract ssid and pass
-        int ssidStart = body.indexOf("ssid=") + 5;
-        int passStart = body.indexOf("pass=") + 5;
-        String ssid_param = body.substring(ssidStart, body.indexOf('&'));
-        String pass_param = body.substring(passStart);
-
-        ssid_param.toCharArray(ssid, 32);
-        pass_param.toCharArray(pass, 64);
-
-        Serial.println("SSID: " + String(ssid));
-        Serial.println("Password: " + String(pass));
-
-        // Send response
-        client.println("HTTP/1.1 200 OK");
-        client.println("Content-type:text/html");
-        client.println("Connection: close");
-        client.println();
-        client.println(generateSuccessPage());
-        client.println();
-
-        // Connect to WiFi
-        needsWiFiConfig = false;
-        connectToWiFi();
-    }
-    client.stop();
-} */
+}
 
 /**
  * Function to connect to the Wi-Fi network using the credentials provided by the user.
@@ -419,13 +370,7 @@ void printWEB()
     client = server.available();
     if (client)
     {
-
-        /*
-                if (!client.connected()) {
-                    Serial.println("Client disconnected too soon");
-                    return;
-                } */
-
+        readSensors();
         Serial.println("new client yeay");
         Serial.print("object client : ");
         Serial.println(client);
@@ -436,12 +381,11 @@ void printWEB()
         String currentLine = "";
         while (client.connected())
         {
-            Serial.println("client connected");
+            
 
             if (client.available())
             {
-                Serial.println("client available");
-                Serial.println("------------------------");
+                
                 char c = client.read();
                 Serial.write(c);
 
@@ -454,11 +398,7 @@ void printWEB()
                         client.println("Connection: close");
                         client.println();
 
-                        client.println("<!DOCTYPE html><html>");
-                        client.println("<head><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-                        client.println("<link rel=\"icon\" href=\"data:,\">");
-                        client.println("<h1>Sensor Data Page</h1>");
-                        client.println("</html>");
+                        client.println(generateDataPage(t, h, percentage1, percentage2));
                         client.println();
 
                         break;
@@ -473,7 +413,6 @@ void printWEB()
                     currentLine += c; // add it to the end of the currentLine
                     tmpHeader += c;
                 }
-
             }
         }
         Serial.print("current line is : ");
@@ -481,4 +420,31 @@ void printWEB()
     }
     client.stop();
     Serial.println("client disconnected nooo");
+}
+
+//--------------------------------------------END OF WEB SERVER FUNCTIONS--------------------------------------------
+
+void readSensors()
+{
+    // Read the sensors values
+    val1 = analogRead(0);
+    val2 = analogRead(1);
+
+    h = dht.readHumidity();
+    t = dht.readTemperature();
+
+    // Map sensor values to percentage
+    percentage1 = map(val1, dry, wet, 0, 100);
+    percentage2 = map(val2, dry, wet, 0, 100);
+
+    // Create JSON object
+    doc["temperature"] = t;
+    doc["humidity"] = h;
+    doc["val1"] = val1;
+    doc["val2"] = val2;
+    doc["moisture1"] = percentage1;
+    doc["moisture2"] = percentage2;
+    serializeJson(doc, Serial);
+
+    
 }
