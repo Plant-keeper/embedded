@@ -1,8 +1,24 @@
+/**
+ * Project Name: PlantKeeper
+ *
+ * @created 23.08.2024
+ * @file  webpages.h
+ * @version 1.0.0
+ * @see https://github.com/Plant-keeper
+ *
+ * @authors
+ *   - Rafael Dousse
+ *   - Eva Ray
+ *   - Quentin Surdez
+ *   - Rachel Tranchida
+ */
+
 #ifndef WEBPAGES_H
 #define WEBPAGES_H
 
 String generateConfigPage(std::vector<const char *> networks)
 {
+     
     String webpage = R"rawliteral(
 <!DOCTYPE html>
 <html>
@@ -85,4 +101,35 @@ String generateSuccessPage()
     return webpage;
 }
 
+
+String generateDataPage(float temperature, float humidity, int soilMoisture1, int soilMoisture2) {
+    String webpage = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hello Plant</title>
+</head>
+<style>
+ body {
+            background: #0a0a23;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+        }
+</style>
+<body>
+    <h1>Hello, Plant!</h1>
+    <p>Current Temperature: )rawliteral";
+    webpage += String(temperature) + " &deg;C</p>";
+    webpage += "<p>Current Humidity: " + String(humidity) + " %</p>";
+    webpage += "<p>Soil Moisture 1: " + String(soilMoisture1) + " %</p>";
+    webpage += "<p>Soil Moisture 2: " + String(soilMoisture2) + " %</p>";
+    webpage += R"rawliteral(
+</body>
+</html>
+)rawliteral";
+    return webpage;
+}
 #endif
