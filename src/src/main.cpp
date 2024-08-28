@@ -22,6 +22,7 @@
 #include "webpages.h"
 #include "DHT.h"
 #include "ArduinoJson.h"
+#include "SI114X.h"
 
 // To check how it works, if time allows
 /* #include <WiFiUdp.h>
@@ -43,26 +44,31 @@ bool needsWiFiConfig = true;
 const char *ssidArduino = "Arduino_Config";
 const char *passArduino = "password";
 
-WiFiServer server(80); // Server socket
-// WiFiWebServer server(80);
-/* WiFiClient client; */
 int status = WL_IDLE_STATUS;
-WiFiClient client;
 std::vector<const char *> networks;
 
-// Instantiate DHT and JSon object
-DHT dht(2, DHT11);
-JsonDocument doc;
-// Global variables used in loop
 int val1;
 int val2;
 int percentage1;
 int percentage2;
 float h;
 float t;
+int visible;
+int IR;
+float UV;
 
 const int dry = 1023;
 const int wet = 700;
+
+// Instantiation of objects
+WiFiServer server(80); // Server socket
+WiFiClient client;
+DHT dht(2, DHT11);
+JsonDocument doc;
+SI114X SI1145 = SI114X();
+
+
+
 
 /* WiFiUDP udp;
 MDNS mdns(udp);
@@ -88,6 +94,12 @@ void setup()
 
     Serial.println("Starting...");
 
+    while (!SI1145.Begin()) {
+        Serial.println("Si1145 is not ready!");
+        delay(1000);
+    }
+
+    dht.begin();
     if (WiFi.status() != WL_CONNECTED)
     {
         listNetworks(networks);
@@ -137,6 +149,7 @@ void loop()
             printWEB();
         }
     }
+
 }
 
 //--------------------------------------------WEB SERVER FUNCTIONS--------------------------------------------
@@ -398,7 +411,7 @@ void printWEB()
                         client.println("Connection: close");
                         client.println();
 
-                        client.println(generateDataPage(t, h, percentage1, percentage2));
+                        client.println(generateDataPage(t, h, val1, percentage1, val2, percentage2, visible, IR, UV));
                         client.println();
 
                         break;
@@ -422,7 +435,7 @@ void printWEB()
     Serial.println("client disconnected nooo");
 }
 
-//--------------------------------------------END OF WEB SERVER FUNCTIONS--------------------------------------------
+//--------------------------------------------Others function--------------------------------------------
 
 void readSensors()
 {
@@ -437,6 +450,12 @@ void readSensors()
     percentage1 = map(val1, dry, wet, 0, 100);
     percentage2 = map(val2, dry, wet, 0, 100);
 
+    visible =  SI1145.ReadVisible();
+    IR = SI1145.ReadIR();
+    UV = ((float)SI1145.ReadUV() / 100); // Value must be divided by 100 to get the correct value
+                                           // Reason can be found in the datasheet of the sensor : 
+                                           // https://www.silabs.com/documents/public/data-sheets/Si1145-46-47.pdf
+                                           // on page 16
     // Create JSON object
     doc["temperature"] = t;
     doc["humidity"] = h;
@@ -444,7 +463,9 @@ void readSensors()
     doc["val2"] = val2;
     doc["moisture1"] = percentage1;
     doc["moisture2"] = percentage2;
+    doc["visible"] = visible;
+    doc["IR"] = IR;
+    doc["UV"] = UV;
     serializeJson(doc, Serial);
-
-    
+    Serial.println();    
 }

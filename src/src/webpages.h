@@ -102,7 +102,7 @@ String generateSuccessPage()
 }
 
 
-String generateDataPage(float temperature, float humidity, int soilMoisture1, int soilMoisture2) {
+String generateDataPage(float temperature, float humidity,int val1, int soilMoisture1, int val2, int soilMoisture2, int visibleLight, int infraLight, float uvLight) {
     String webpage = R"rawliteral(
 <!DOCTYPE html>
 <html>
@@ -124,8 +124,13 @@ String generateDataPage(float temperature, float humidity, int soilMoisture1, in
     <p>Current Temperature: )rawliteral";
     webpage += String(temperature) + " &deg;C</p>";
     webpage += "<p>Current Humidity: " + String(humidity) + " %</p>";
+    webpage += "<p> Value 1: " + String(val1) + "</p>";
     webpage += "<p>Soil Moisture 1: " + String(soilMoisture1) + " %</p>";
+    webpage += "<p> Value 2: " + String(val2) + "</p>";
     webpage += "<p>Soil Moisture 2: " + String(soilMoisture2) + " %</p>";
+    webpage += "<p>Visible Light: " + String(visibleLight) + "</p>";
+    webpage += "<p>Infra Light: " + String(infraLight) + "</p>";
+    webpage += "<p>UV Light: " + String(uvLight) + "</p>";
     webpage += R"rawliteral(
 </body>
 </html>
