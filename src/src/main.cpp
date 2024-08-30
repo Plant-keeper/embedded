@@ -24,6 +24,8 @@
 #include "ArduinoJson.h"
 #include "SI114X.h"
 
+
+
 // To check how it works, if time allows
 /* #include <WiFiUdp.h>
 #include <ArduinoMDNS.h> */
@@ -36,10 +38,13 @@ void connectToWiFi();
 void printWEB();
 void readSensors();
 
+void sendSensorData();
+
 // Global variables
 char ssid[32];
 char pass[64];
 bool needsWiFiConfig = true;
+bool connectedToWiFi = false;
 
 const char *ssidArduino = "Arduino_Config";
 const char *passArduino = "password";
@@ -67,7 +72,18 @@ DHT dht(2, DHT11);
 JsonDocument doc;
 SI114X SI1145 = SI114X();
 
+int port = 8080;
+IPAddress serverAddress(192, 33, 207, 46);
+HttpClient httpClient(client, serverAddress, port);
 
+unsigned long previousMillis = 0;
+const long interval = 10000;
+
+typedef struct {
+  boolean existing;
+  const char * ssid;
+  const char* pass;
+} wifi;
 
 
 /* WiFiUDP udp;
@@ -87,14 +103,17 @@ MDNS mdns(udp);
   }
 } */
 
+const char* ssidForTest = "MyArduino";
+const char* passForTest = "password";
+
 void setup()
 {
 
     Serial.begin(9600);
-
     Serial.println("Starting...");
 
-    while (!SI1145.Begin()) {
+    while (!SI1145.Begin())
+    {
         Serial.println("Si1145 is not ready!");
         delay(1000);
     }
@@ -113,7 +132,7 @@ void setup()
 
 void loop()
 {
-    /* const char *hostName = "MyArduino";
+   /* const char *hostName = "MyArduino";
     int length = strlen(hostName);
       if (!mdns.isResolvingName()) {
         if (length > 0) {
@@ -132,7 +151,7 @@ void loop()
       }
        mdns.run(); */
 
-    if (needsWiFiConfig)
+     if (needsWiFiConfig)
     {
         client = server.available();
         if (client)
@@ -150,10 +169,25 @@ void loop()
         }
     }
 
+    if (connectedToWiFi)
+    {
+        unsigned long currentMillis = millis();
+        if (currentMillis - previousMillis >= interval)
+        {
+            Serial.println("Sending sensor data...");
+            previousMillis = currentMillis;
+            sendSensorData();
+        }
+    }
 }
+
+
 
 //--------------------------------------------WEB SERVER FUNCTIONS--------------------------------------------
 
+/**
+ * @brief List the nearby networks
+ **/
 void listNetworks(std::vector<const char *> &network)
 {
     // scan for nearby networks:
@@ -179,7 +213,7 @@ void listNetworks(std::vector<const char *> &network)
 }
 
 /**
- * Function to start the Arduino in Access Point mode
+ * @brief Start the Arduino in Access Point mode
  */
 void startAccessPoint()
 {
@@ -228,7 +262,7 @@ void startAccessPoint()
 }
 
 /**
- * Function to handle the configuration request and extract SSID and Password
+ * @brief Hhandle the configuration request and extract SSID and Password
  */
 void handleConfigRequest()
 {
@@ -275,7 +309,7 @@ void handleConfigRequest()
                 }
                 else if (header.length() == 0)
                 {
-                   
+
                     Serial.println("Sending Config Page...");
                     client.println("HTTP/1.1 200 OK");
                     client.println("Content-type:text/html");
@@ -344,7 +378,7 @@ void handleConfigRequest()
 }
 
 /**
- * Function to connect to the Wi-Fi network using the credentials provided by the user.
+ * @brief Function to connect to the Wi-Fi network using the credentials provided by the user.
  */
 void connectToWiFi()
 {
@@ -370,17 +404,18 @@ void connectToWiFi()
     Serial.print("IP Address: ");
     Serial.println(ip);
     server.begin();
+    connectedToWiFi = true;
     delay(1000);
 }
 
 /**
- * Function that handles the HTTP response to display a web page.
- * It receives client requests, sends the HTML page, and manages the disconnection.
+ * @brief Prints the web page with the sensor values
  */
 void printWEB()
 {
     String tmpHeader = "";
     client = server.available();
+
     if (client)
     {
         readSensors();
@@ -394,11 +429,10 @@ void printWEB()
         String currentLine = "";
         while (client.connected())
         {
-            
 
             if (client.available())
             {
-                
+
                 char c = client.read();
                 Serial.write(c);
 
@@ -435,8 +469,45 @@ void printWEB()
     Serial.println("client disconnected nooo");
 }
 
+int statusCode = 0;
+/**
+ * @brief Send the sensor data to the distant server
+ */
+void sendSensorData()
+{
+    readSensors();
+    String jsonData;
+    serializeJson(doc, jsonData);
+    Serial.print("JSON data: ");
+    Serial.println(jsonData);
+
+    if (!statusCode)
+    {
+        // Send HTTP POST request
+        httpClient.beginRequest();
+        httpClient.post("/sensor-data");
+        httpClient.sendHeader("Content-Type", "application/json");
+        httpClient.sendHeader("Content-Length", jsonData.length());
+        httpClient.beginBody();
+        httpClient.print(jsonData);
+        httpClient.endRequest();
+
+        // Get HTTP response
+        statusCode = httpClient.responseStatusCode();
+        String response = httpClient.responseBody();
+        Serial.print("Status code: ");
+        Serial.println(statusCode);
+        Serial.print("Response: ");
+        Serial.println(response);
+
+        statusCode = 0;
+    }
+}
 //--------------------------------------------Others function--------------------------------------------
 
+/**
+ * @brief Read the sensors values
+ */
 void readSensors()
 {
     // Read the sensors values
@@ -450,12 +521,13 @@ void readSensors()
     percentage1 = map(val1, dry, wet, 0, 100);
     percentage2 = map(val2, dry, wet, 0, 100);
 
-    visible =  SI1145.ReadVisible();
+    visible = SI1145.ReadVisible();
     IR = SI1145.ReadIR();
     UV = ((float)SI1145.ReadUV() / 100); // Value must be divided by 100 to get the correct value
-                                           // Reason can be found in the datasheet of the sensor : 
-                                           // https://www.silabs.com/documents/public/data-sheets/Si1145-46-47.pdf
-                                           // on page 16
+                                         // Reason can be found in the datasheet of the sensor :
+                                         // https://www.silabs.com/documents/public/data-sheets/Si1145-46-47.pdf
+                                         // on page 16
+
     // Create JSON object
     doc["temperature"] = t;
     doc["humidity"] = h;
@@ -466,6 +538,4 @@ void readSensors()
     doc["visible"] = visible;
     doc["IR"] = IR;
     doc["UV"] = UV;
-    serializeJson(doc, Serial);
-    Serial.println();    
 }
