@@ -24,8 +24,6 @@
 #include "ArduinoJson.h"
 #include "SI114X.h"
 
-
-
 // To check how it works, if time allows
 /* #include <WiFiUdp.h>
 #include <ArduinoMDNS.h> */
@@ -37,6 +35,7 @@ void handleConfigRequest();
 void connectToWiFi();
 void printWEB();
 void readSensors();
+void printWifiStatus();
 
 void sendSensorData();
 
@@ -45,6 +44,7 @@ char ssid[32];
 char pass[64];
 bool needsWiFiConfig = true;
 bool connectedToWiFi = false;
+bool incorrectPassword = false;
 
 const char *ssidArduino = "Arduino_Config";
 const char *passArduino = "password";
@@ -52,15 +52,7 @@ const char *passArduino = "password";
 int status = WL_IDLE_STATUS;
 std::vector<const char *> networks;
 
-int val1;
-int val2;
-int percentage1;
-int percentage2;
-float h;
-float t;
-int visible;
-int IR;
-float UV;
+sensorData sensorDatas;
 
 const int dry = 1023;
 const int wet = 700;
@@ -73,18 +65,21 @@ JsonDocument doc;
 SI114X SI1145 = SI114X();
 
 int port = 8080;
-IPAddress serverAddress(192, 33, 207, 46);
+IPAddress serverAddress(192, 168, 183, 1);
 HttpClient httpClient(client, serverAddress, port);
+
+// It should be always the same, it might change but the arduino usually has the same IP in access point mode
+String ipArduino = "192.168.4.1";
 
 unsigned long previousMillis = 0;
 const long interval = 10000;
 
-typedef struct {
-  boolean existing;
-  const char * ssid;
-  const char* pass;
+typedef struct
+{
+    boolean existing;
+    const char *ssid;
+    const char *pass;
 } wifi;
-
 
 /* WiFiUDP udp;
 MDNS mdns(udp);
@@ -103,8 +98,8 @@ MDNS mdns(udp);
   }
 } */
 
-const char* ssidForTest = "MyArduino";
-const char* passForTest = "password";
+const char *ssidForTest = "MyArduino";
+const char *passForTest = "password";
 
 void setup()
 {
@@ -119,9 +114,10 @@ void setup()
     }
 
     dht.begin();
+    listNetworks(networks);
     if (WiFi.status() != WL_CONNECTED)
     {
-        listNetworks(networks);
+        printWifiStatus();
         startAccessPoint(); // Start in AP mode to configure WiFi
     }
     else
@@ -132,30 +128,31 @@ void setup()
 
 void loop()
 {
-   /* const char *hostName = "MyArduino";
-    int length = strlen(hostName);
-      if (!mdns.isResolvingName()) {
-        if (length > 0) {
-          Serial.print("Resolving '");
-          Serial.print(hostName);
-          Serial.println("' via Multicast DNS (Bonjour)...");
+    /* const char *hostName = "MyArduino";
+     int length = strlen(hostName);
+       if (!mdns.isResolvingName()) {
+         if (length > 0) {
+           Serial.print("Resolving '");
+           Serial.print(hostName);
+           Serial.println("' via Multicast DNS (Bonjour)...");
 
-          // Now we tell the mDNS library to resolve the host name. We give it a
-          // timeout of 5 seconds (e.g. 5000 milliseconds) to find an answer. The
-          // library will automatically resend the query every second until it
-          // either receives an answer or your timeout is reached - In either case,
-          // the callback function you specified in setup() will be called.
+           // Now we tell the mDNS library to resolve the host name. We give it a
+           // timeout of 5 seconds (e.g. 5000 milliseconds) to find an answer. The
+           // library will automatically resend the query every second until it
+           // either receives an answer or your timeout is reached - In either case,
+           // the callback function you specified in setup() will be called.
 
-          mdns.resolveName(hostName, 5000);
-        }
-      }
-       mdns.run(); */
+           mdns.resolveName(hostName, 5000);
+         }
+       }
+        mdns.run(); */
 
-     if (needsWiFiConfig)
+    if (needsWiFiConfig)
     {
         client = server.available();
         if (client)
         {
+
             handleConfigRequest();
         }
     }
@@ -167,21 +164,19 @@ void loop()
             Serial.println("Client available... so printweb");
             printWEB();
         }
-    }
+     } 
 
-    if (connectedToWiFi)
-    {
-        unsigned long currentMillis = millis();
-        if (currentMillis - previousMillis >= interval)
+    /*     if (connectedToWiFi)
         {
-            Serial.println("Sending sensor data...");
-            previousMillis = currentMillis;
-            sendSensorData();
-        }
-    }
+            unsigned long currentMillis = millis();
+            if (currentMillis - previousMillis >= interval)
+            {
+                Serial.println("Sending sensor data...");
+                previousMillis = currentMillis;
+                sendSensorData();
+            }
+        } */
 }
-
-
 
 //--------------------------------------------WEB SERVER FUNCTIONS--------------------------------------------
 
@@ -274,6 +269,7 @@ void handleConfigRequest()
 
     WiFiClient client = server.available();
 
+    // listNetworks(networks);
     while (client.connected())
     {
 
@@ -315,7 +311,7 @@ void handleConfigRequest()
                     client.println("Content-type:text/html");
                     client.println("Connection: close");
                     client.println();
-                    client.println(generateConfigPage(networks));
+                    client.println(generateConfigPage(networks, incorrectPassword));
                     client.println();
                     break;
                 }
@@ -382,23 +378,38 @@ void handleConfigRequest()
  */
 void connectToWiFi()
 {
-    Serial.print("Connecting to WiFi SSID: ");
-    Serial.println(ssid);
+    // Serial.print("Connecting to WiFi SSID: ");
+    // Serial.println(ssid);
     WiFi.end();
     delay(1000);
-    WiFi.begin(ssid, pass);
-
+    Serial.println("Connecting to WiFi...");
     while (WiFi.status() != WL_CONNECTED)
     {
 
-        status = WiFi.begin(ssid, pass);
-        Serial.print("Wifi status : ");
+        //status = WiFi.begin(ssid, pass);
+        status = WiFi.begin("SamsungR", "123456789");
+        Serial.print("The Wifi is status : ");
         Serial.println(WiFi.status());
+        Serial.println("LE WIFI ET MP SONT RENTRE EN DUREE");
+        printWifiStatus();
         delay(1000);
         Serial.print(".");
+
+        if ((WiFi.status() == WL_CONNECT_FAILED) || (WiFi.status() == WL_DISCONNECTED))
+        {
+            Serial.println("Connection failed!");
+            printWifiStatus();
+            incorrectPassword = true;
+            needsWiFiConfig = true;
+            ssid[0] = '\0';
+            pass[0] = '\0';
+            startAccessPoint();
+            return;
+        }
     }
     Serial.println();
     Serial.println("Connected to WiFi!");
+    printWifiStatus();
 
     IPAddress ip = WiFi.localIP();
     Serial.print("IP Address: ");
@@ -435,9 +446,11 @@ void printWEB()
 
                 char c = client.read();
                 Serial.write(c);
+                Serial.println(currentLine);
 
                 if (c == '\n')
                 {
+
                     if (currentLine.length() == 0)
                     {
                         client.println("HTTP/1.1 200 OK");
@@ -445,10 +458,22 @@ void printWEB()
                         client.println("Connection: close");
                         client.println();
 
-                        client.println(generateDataPage(t, h, val1, percentage1, val2, percentage2, visible, IR, UV));
+                        client.println(generateDataPage(ipArduino, sensorDatas));
                         client.println();
 
                         break;
+                    }
+                    else if (currentLine.indexOf("POST /reconfigure") >= 0)
+                    {
+                        Serial.println("reconfigure");
+                        needsWiFiConfig = true;
+                        connectedToWiFi = false;
+                        incorrectPassword = false;
+                        ssid[0] = '\0';
+                        pass[0] = '\0';
+                        client.stop();
+                        startAccessPoint();
+                        return;
                     }
                     else
                     { // if you got a newline, then clear currentLine:
@@ -481,16 +506,44 @@ void sendSensorData()
     Serial.print("JSON data: ");
     Serial.println(jsonData);
 
+    httpClient.setHttpResponseTimeout(5000);
+
     if (!statusCode)
     {
         // Send HTTP POST request
+        Serial.println("Sending HTTP begin request...");
         httpClient.beginRequest();
-        httpClient.post("/sensor-data");
+        Serial.println("Request begun!");
+        if (httpClient.connected())
+        {
+            Serial.println("Client connected!");
+        }
+        else
+        {
+            Serial.println("Client not connected!");
+        }
+        if (httpClient.patch("/sensor-data") != 0)
+        {
+            Serial.println("Post request failed!");
+            httpClient.stop();
+            return;
+        }
+        else
+        {
+            Serial.println("Post request sent!");
+        }
+
+        Serial.println("Patch request sent!");
         httpClient.sendHeader("Content-Type", "application/json");
+        Serial.println("Header sent!");
         httpClient.sendHeader("Content-Length", jsonData.length());
+        Serial.println("Header sent!");
         httpClient.beginBody();
+        Serial.println("Body begun!");
         httpClient.print(jsonData);
+        Serial.println("json data sent!");
         httpClient.endRequest();
+        Serial.println("Request sent!");
 
         // Get HTTP response
         statusCode = httpClient.responseStatusCode();
@@ -511,31 +564,73 @@ void sendSensorData()
 void readSensors()
 {
     // Read the sensors values
-    val1 = analogRead(0);
-    val2 = analogRead(1);
-
-    h = dht.readHumidity();
-    t = dht.readTemperature();
+    sensorDatas.soilHumidity = analogRead(0);
+   
+    sensorDatas.airHumidity = dht.readHumidity();
+    sensorDatas.temperature = dht.readTemperature();
 
     // Map sensor values to percentage
-    percentage1 = map(val1, dry, wet, 0, 100);
-    percentage2 = map(val2, dry, wet, 0, 100);
-
-    visible = SI1145.ReadVisible();
-    IR = SI1145.ReadIR();
-    UV = ((float)SI1145.ReadUV() / 100); // Value must be divided by 100 to get the correct value
+    sensorDatas.percentage = map(sensorDatas.soilHumidity, dry, wet, 0, 100);
+   
+    sensorDatas.visible = SI1145.ReadVisible();
+    sensorDatas.IR = SI1145.ReadIR();
+    sensorDatas.UV = ((float)SI1145.ReadUV() / 100); // Value must be divided by 100 to get the correct value
                                          // Reason can be found in the datasheet of the sensor :
                                          // https://www.silabs.com/documents/public/data-sheets/Si1145-46-47.pdf
                                          // on page 16
 
     // Create JSON object
-    doc["temperature"] = t;
-    doc["humidity"] = h;
-    doc["val1"] = val1;
-    doc["val2"] = val2;
-    doc["moisture1"] = percentage1;
-    doc["moisture2"] = percentage2;
-    doc["visible"] = visible;
-    doc["IR"] = IR;
-    doc["UV"] = UV;
+    doc["temperature"] =  sensorDatas.temperature;
+    doc["airHumidity"] =  sensorDatas.airHumidity;
+    doc["soilHumidity"] =  sensorDatas.soilHumidity;
+    doc["moisture1"] =  sensorDatas.percentage;
+    doc["visible"] =  sensorDatas.visible;
+    doc["IR"] =  sensorDatas.IR;
+    doc["UV"] =  sensorDatas.UV;
+}
+
+void printWifiStatus()
+{
+    wl_status_t status = (wl_status_t)WiFi.status();
+    Serial.print("WiFi status: ");
+    switch (status)
+    {
+    case WL_NO_SHIELD:
+        Serial.println("No shield is present");
+        break;
+    case WL_IDLE_STATUS:
+        Serial.println("Idle status");
+        break;
+    case WL_NO_SSID_AVAIL:
+
+        Serial.println("No SSID available");
+        break;
+    case WL_SCAN_COMPLETED:
+        Serial.println("Scan completed");
+        break;
+    case WL_CONNECTED:
+        Serial.println("Connected");
+        break;
+    case WL_CONNECT_FAILED:
+        Serial.println("Connection failed");
+        break;
+    case WL_CONNECTION_LOST:
+        Serial.println("Connection lost");
+        break;
+    case WL_DISCONNECTED:
+        Serial.println("Disconnected");
+        break;
+    case WL_AP_LISTENING:
+        Serial.println("AP listening");
+        break;
+    case WL_AP_CONNECTED:
+        Serial.println("AP connected");
+        break;
+    case WL_AP_FAILED:
+        Serial.println("AP failed");
+        break;
+    default:
+        Serial.println("Unknown status");
+        break;
+    }
 }
