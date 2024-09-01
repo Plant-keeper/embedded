@@ -15,10 +15,11 @@
 
 #ifndef WEBPAGES_H
 #define WEBPAGES_H
+#include "sensorData.h"
 
-String generateConfigPage(std::vector<const char *> networks)
-{
-     
+
+String generateConfigPage(std::vector<const char *> networks, bool passwordFailed)
+{     
     String webpage = R"rawliteral(
 <!DOCTYPE html>
 <html>
@@ -50,9 +51,8 @@ String generateConfigPage(std::vector<const char *> networks)
         }
 </style>
 <body>
-    <h1>WiFi Configuration</h1>
-    
-   <label for="ssid">Select a network:</label>
+    <h1>WiFi Configuration</h1>  
+  <label for="ssid">Select a network:</label>
        <form action="/submit" method="POST">
 <select name="ssid" id="ssid"> )rawliteral";
     for (auto network : networks)
@@ -67,6 +67,12 @@ String generateConfigPage(std::vector<const char *> networks)
         <input type="password" id="pass" name="pass"><br><br>
         <input type="submit" value="Submit">
     </form>
+    )rawliteral";
+    if(passwordFailed) {
+        webpage += "<p style=\"color: red;\">You've entered an incorrect password. Please try again.</p>";
+    }
+    
+      webpage += R"rawliteral(
 </body>
 </html>
 )rawliteral";
@@ -93,8 +99,10 @@ String generateSuccessPage()
 
 </style>
 <body>
-    <h1>Configuration Successful!</h1>
-    <p>The device is now connecting to the specified WiFi network.</p>
+    <h1>Your sensor is connecting!</h1>
+    <p>The device is now connecting to the specified WiFi network. If you cannot access to your datas
+    then you might have entered an incorect password. Check the previous ip page and reconnect to the wifi in that case </p>
+    <p> To access to your datas, click on this link <a href="http://192.168.183.146"> datas </a>   </p>
 </body>
 </html>
 )rawliteral";
@@ -102,7 +110,7 @@ String generateSuccessPage()
 }
 
 
-String generateDataPage(float temperature, float humidity,int val1, int soilMoisture1, int val2, int soilMoisture2, int visibleLight, int infraLight, float uvLight) {
+String generateDataPage(String IP, sensorData data) {
     String webpage = R"rawliteral(
 <!DOCTYPE html>
 <html>
@@ -118,20 +126,44 @@ String generateDataPage(float temperature, float humidity,int val1, int soilMois
             padding: 20px;
             text-align: center;
         }
+
+        input[type="submit"] {
+        background-color: #4CAF50;
+        color: white;
+        cursor: pointer;
+    }
+
 </style>
 <body>
     <h1>Hello, Plant!</h1>
     <p>Current Temperature: )rawliteral";
-    webpage += String(temperature) + " &deg;C</p>";
-    webpage += "<p>Current Humidity: " + String(humidity) + " %</p>";
-    webpage += "<p> Value 1: " + String(val1) + "</p>";
-    webpage += "<p>Soil Moisture 1: " + String(soilMoisture1) + " %</p>";
-    webpage += "<p> Value 2: " + String(val2) + "</p>";
-    webpage += "<p>Soil Moisture 2: " + String(soilMoisture2) + " %</p>";
-    webpage += "<p>Visible Light: " + String(visibleLight) + "</p>";
-    webpage += "<p>Infra Light: " + String(infraLight) + "</p>";
-    webpage += "<p>UV Light: " + String(uvLight) + "</p>";
+    webpage += String(data.temperature) + " &deg;C</p>";
+    webpage += "<p>Current Humidity: " + String(data.airHumidity) + " %</p>";
+    webpage += "<p> Value 1: " + String(data.soilHumidity) + "</p>";
+    webpage += "<p>Soil Moisture 1: " + String(data.percentage) + " %</p>";
+    webpage += "<p>Visible Light: " + String(data.visible) + "</p>";
+    webpage += "<p>Infra Light: " + String(data.IR) + "</p>";
+    webpage += "<p>UV Light: " + String(data.UV) + "</p>";
     webpage += R"rawliteral(
+    <p>Click here on the button below to change the WiFi configuration:</p>
+   
+    <form id="reconfigForm" action="/reconfigure" method="post">
+        <button type="button" onClick="submitFormAndRedirect()">Changer la configuration Wi-Fi</button>
+    </form>
+
+    <script>
+        function submitFormAndRedirect() {
+            // Submit the form
+            document.getElementById('reconfigForm').submit();
+            
+            // Wait a moment before redirecting to allow form submission
+            setTimeout(function() {
+                window.location.href = 'http://192.168.4.1';
+            }, 3000); // Adjust the timeout as necessary
+        }
+    </script>
+
+
 </body>
 </html>
 )rawliteral";
