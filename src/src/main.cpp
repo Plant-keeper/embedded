@@ -17,7 +17,6 @@
 #include <WiFiNINA.h>
 #include <ArduinoHttpServer.h>
 #include <ArduinoHttpClient.h>
-#include "arduino_secrets.h"
 #include <vector>
 #include "webpages.h"
 #include "DHT.h"
@@ -40,6 +39,7 @@ void printWifiStatus();
 void sendSensorData();
 
 // Global variables
+int sensorId;
 char ssid[32];
 char pass[64];
 bool needsWiFiConfig = true;
@@ -60,19 +60,29 @@ const int wet = 700;
 // Instantiation of objects
 WiFiServer server(80); // Server socket
 WiFiClient client;
+
+WiFiSSLClient sslClient;
 DHT dht(2, DHT11);
 JsonDocument doc;
 SI114X SI1145 = SI114X();
 
-int port = 8080;
-IPAddress serverAddress(192, 168, 183, 1);
+
+//ADRESS IP OF SERVER NEEDS TO BE ADDED HERE
+IPAddress serverAddress();
+// PORT OF SERVER NEEDS TO BE ADDED HERE
+int port = ;
+
 HttpClient httpClient(client, serverAddress, port);
 
 // It should be always the same, it might change but the arduino usually has the same IP in access point mode
 String ipArduino = "192.168.4.1";
 
 unsigned long previousMillis = 0;
+//10 seconds interval for the data to be sent
 const long interval = 10000;
+// 1 seconds interval for led to blink
+const long intervalLed = 1000;
+unsigned long previousMillisLed = 0;
 
 typedef struct
 {
@@ -98,6 +108,51 @@ MDNS mdns(udp);
   }
 } */
 
+int statusCode = 0;
+/**
+ * @brief Send the sensor data to the distant server
+ */
+void sendSensorData()
+{
+    readSensors();
+    String jsonData;
+    serializeJson(doc, jsonData);
+    Serial.print("JSON data: ");
+    Serial.println(jsonData);
+
+    httpClient.setHttpResponseTimeout(2000);
+
+    if (!statusCode)
+    {
+        // Send HTTP POST request
+        Serial.println("Sending HTTP begin request...");
+        httpClient.beginRequest();
+        Serial.println("Request begun!");   
+        httpClient.post("/sensor-data") ;
+        Serial.println("post request sent!");
+        httpClient.sendHeader("Content-Type", "application/json");
+        Serial.println("Header sent!");
+        httpClient.sendHeader("Content-Length", String(jsonData.length()));
+        httpClient.sendHeader("Accept", "*/*");
+        httpClient.beginBody();
+        Serial.println("Body begun!");
+        httpClient.print(jsonData);
+        Serial.println("json data sent!");
+        httpClient.endRequest();
+        Serial.println("Request sent!");
+
+        // Get HTTP response
+        statusCode = httpClient.responseStatusCode();
+        String response = httpClient.responseBody();
+        Serial.print("Status code: ");
+        Serial.println(statusCode);
+        Serial.print("Response: ");
+        Serial.println(response);
+
+        statusCode = 0;
+    }
+}
+
 const char *ssidForTest = "MyArduino";
 const char *passForTest = "password";
 
@@ -106,6 +161,8 @@ void setup()
 
     Serial.begin(9600);
     Serial.println("Starting...");
+
+    pinMode(LED_BUILTIN, OUTPUT);
 
     while (!SI1145.Begin())
     {
@@ -166,7 +223,7 @@ void loop()
         }
      } 
 
-    /*     if (connectedToWiFi)
+         if (connectedToWiFi)
         {
             unsigned long currentMillis = millis();
             if (currentMillis - previousMillis >= interval)
@@ -175,7 +232,11 @@ void loop()
                 previousMillis = currentMillis;
                 sendSensorData();
             }
-        } */
+            if(currentMillis - previousMillisLed >= intervalLed){
+                previousMillisLed = currentMillis;
+                digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
+            }
+        } 
 }
 
 //--------------------------------------------WEB SERVER FUNCTIONS--------------------------------------------
@@ -212,6 +273,7 @@ void listNetworks(std::vector<const char *> &network)
  */
 void startAccessPoint()
 {
+    digitalWrite(LED_BUILTIN, HIGH);
     Serial.println("Starting Access Point...");
     WiFi.end();
 
@@ -263,8 +325,9 @@ void handleConfigRequest()
 {
     Serial.println("Handling Config Request...");
     String header = "";
-    String ssid_param = "";
-    String pass_param = "";
+    String ssidParam = "";
+    String passParam = "";
+    String sensorParam = "";
     String tmpRequest = "";
 
     WiFiClient client = server.available();
@@ -283,15 +346,18 @@ void handleConfigRequest()
                     Serial.println("SSID and Password received!");
                     int ssidIndex = header.indexOf("ssid=") + 5;
                     int passIndex = header.indexOf("pass=") + 5;
-                    ssid_param = header.substring(ssidIndex, header.indexOf('&'));
-                    pass_param = header.substring(passIndex, header.indexOf(' ', passIndex));
+                    ssidParam = header.substring(ssidIndex, header.indexOf('&'));
+                    passParam = header.substring(passIndex, header.indexOf(' ', passIndex));
 
-                    ssid_param.toCharArray(ssid, 32);
-                    pass_param.toCharArray(pass, 64);
+                    ssidParam.toCharArray(ssid, 32);
+                    passParam.toCharArray(pass, 64);
+                    sensorId = sensorParam.toInt();
                     Serial.println("SSID is : ");
                     Serial.println(ssid);
                     Serial.println("Password is : ");
                     Serial.println(pass);
+                    Serial.println("SensorId is : ");
+                    Serial.println(sensorId);
 
                     client.println("HTTP/1.1 200 OK");
                     client.println("Content-type:text/html");
@@ -329,15 +395,21 @@ void handleConfigRequest()
                     // Extract SSID and password from the POST body
                     int ssidIndex = postBody.indexOf("ssid=") + 5;
                     int passIndex = postBody.indexOf("pass=") + 5;
-                    ssid_param = postBody.substring(ssidIndex, postBody.indexOf('&', ssidIndex));
-                    pass_param = postBody.substring(passIndex); // Assuming password is the last field
+                    int idIndex   = postBody.indexOf("idsensor=") + 9;
+                    ssidParam = postBody.substring(ssidIndex, postBody.indexOf('&', ssidIndex));
+                    passParam = postBody.substring(passIndex, postBody.indexOf('&', passIndex)); // Assuming password is the last field
+                    sensorParam = postBody.substring(idIndex);
 
-                    ssid_param.toCharArray(ssid, 32);
-                    pass_param.toCharArray(pass, 64);
+
+                    ssidParam.toCharArray(ssid, 32);
+                    passParam.toCharArray(pass, 64);
+                    sensorId = sensorParam.toInt();
                     Serial.println("SSID is : ");
                     Serial.println(ssid);
                     Serial.println("Password is : ");
                     Serial.println(pass);
+                    Serial.println("SensorId is : ");
+                    Serial.println(sensorId);
 
                     client.println("HTTP/1.1 200 OK");
                     client.println("Content-type:text/html");
@@ -364,7 +436,7 @@ void handleConfigRequest()
     }
     Serial.print("Header is : ");
     Serial.println(tmpRequest);
-    if (ssid_param.length() > 0 && pass_param.length() > 0)
+    if (ssidParam.length() > 0 && passParam.length() > 0)
     {
         needsWiFiConfig = false;
         connectToWiFi();
@@ -385,12 +457,12 @@ void connectToWiFi()
     Serial.println("Connecting to WiFi...");
     while (WiFi.status() != WL_CONNECTED)
     {
-
-        //status = WiFi.begin(ssid, pass);
-        status = WiFi.begin("SamsungR", "123456789");
+        
+        status = WiFi.begin(ssid, pass);
+        //status = WiFi.begin("SamsungR", "123456789");
         Serial.print("The Wifi is status : ");
         Serial.println(WiFi.status());
-        Serial.println("LE WIFI ET MP SONT RENTRE EN DUREE");
+        //Serial.println("LE WIFI ET MP SONT RENTRE EN DUREE");
         printWifiStatus();
         delay(1000);
         Serial.print(".");
@@ -416,6 +488,7 @@ void connectToWiFi()
     Serial.println(ip);
     server.begin();
     connectedToWiFi = true;
+    digitalWrite(LED_BUILTIN, LOW);
     delay(1000);
 }
 
@@ -494,68 +567,8 @@ void printWEB()
     Serial.println("client disconnected nooo");
 }
 
-int statusCode = 0;
-/**
- * @brief Send the sensor data to the distant server
- */
-void sendSensorData()
-{
-    readSensors();
-    String jsonData;
-    serializeJson(doc, jsonData);
-    Serial.print("JSON data: ");
-    Serial.println(jsonData);
 
-    httpClient.setHttpResponseTimeout(5000);
 
-    if (!statusCode)
-    {
-        // Send HTTP POST request
-        Serial.println("Sending HTTP begin request...");
-        httpClient.beginRequest();
-        Serial.println("Request begun!");
-        if (httpClient.connected())
-        {
-            Serial.println("Client connected!");
-        }
-        else
-        {
-            Serial.println("Client not connected!");
-        }
-        if (httpClient.patch("/sensor-data") != 0)
-        {
-            Serial.println("Post request failed!");
-            httpClient.stop();
-            return;
-        }
-        else
-        {
-            Serial.println("Post request sent!");
-        }
-
-        Serial.println("Patch request sent!");
-        httpClient.sendHeader("Content-Type", "application/json");
-        Serial.println("Header sent!");
-        httpClient.sendHeader("Content-Length", jsonData.length());
-        Serial.println("Header sent!");
-        httpClient.beginBody();
-        Serial.println("Body begun!");
-        httpClient.print(jsonData);
-        Serial.println("json data sent!");
-        httpClient.endRequest();
-        Serial.println("Request sent!");
-
-        // Get HTTP response
-        statusCode = httpClient.responseStatusCode();
-        String response = httpClient.responseBody();
-        Serial.print("Status code: ");
-        Serial.println(statusCode);
-        Serial.print("Response: ");
-        Serial.println(response);
-
-        statusCode = 0;
-    }
-}
 //--------------------------------------------Others function--------------------------------------------
 
 /**
@@ -580,11 +593,12 @@ void readSensors()
                                          // on page 16
 
     // Create JSON object
+    doc["id"] = sensorId;
     doc["temperature"] =  sensorDatas.temperature;
-    doc["airHumidity"] =  sensorDatas.airHumidity;
+    doc["humidity"] =  sensorDatas.airHumidity;
     doc["soilHumidity"] =  sensorDatas.soilHumidity;
     doc["moisture1"] =  sensorDatas.percentage;
-    doc["visible"] =  sensorDatas.visible;
+    doc["light"] =  sensorDatas.visible;
     doc["IR"] =  sensorDatas.IR;
     doc["UV"] =  sensorDatas.UV;
 }
