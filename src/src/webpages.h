@@ -65,6 +65,8 @@ String generateConfigPage(std::vector<const char *> networks, bool passwordFaile
 
         <label for="pass">Password:</label><br>
         <input type="password" id="pass" name="pass"><br><br>
+        <label for="idsensor">Enter your sensor id:</label><br>
+        <input type="number" id="idsensor" name="idsensor"><br><br>
         <input type="submit" value="Submit">
     </form>
     )rawliteral";
