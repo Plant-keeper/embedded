@@ -11,7 +11,7 @@
  *   - Eva Ray
  *   - Quentin Surdez
  *   - Rachel Tranchida
- * @brief File to keep the wifi credentials
+ * @brief File to keep the access point mode credentials
  * 
  */
 
