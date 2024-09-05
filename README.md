@@ -56,15 +56,22 @@ For measuring ambient temperature and humidity, we used the __DHT11__ sensor fro
 with the __DHT.h__
 library. The sensor directly provides the temperature in Celsius, making it easy to integrate into our system. Its
 simplicity and reliability make it ideal for tracking the room conditions where the plant is located, providing
-essential data for plant health monitoring. It is important to note that the sensor is not always accurate and the values
+essential data for plant health monitoring. It is important to note that the sensor is not always accurate and the
+values
 can vary a lot depending on the environment.
 
 ### 6. Data Transmission via HTTP
 
-The Arduino sends the sensor data to a proxy server via __HTTP__ every 5 minutes. This frequency is set to balance between
-timely updates and minimizing power consumption. Also, since we are monitoring plants, we don't need very frequent 
+The Arduino sends the sensor data to a proxy server via __HTTP__ every 5 minutes. This frequency is set to balance
+between
+timely updates and minimizing power consumption. Also, since we are monitoring plants, we don't need very frequent
 updates since the plant's condition changes slowly and not in real-time.
 The regular data transmission ensures that the user is always
 up-to-date with the plant’s condition without overwhelming the server or network with excessive requests.
+
+In summary, the embedded system of PlantKeeper combines well-thought hardware and software choices to reliably
+collect and transmit environmental data. By leveraging the power efficiency of Arduino and the flexibility of C++, along
+with careful calibration of our sensors, we were able to design a system that is both functional and adaptable to the
+needs of plant monitoring.
 
 ## Improvements and Future Work
