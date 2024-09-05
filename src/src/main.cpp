@@ -43,6 +43,7 @@ char pass[64];
 bool needsWiFiConfig = true;
 bool connectedToWiFi = false;
 bool incorrectPassword = false;
+bool APMode = false;
 const int dry = 1023;
 const int wet = 700;
 const int minLight = 160;
@@ -73,17 +74,18 @@ SI114X SI1145 = SI114X();
 
 //--------------------------------------------IMPORTANT--------------------------------------------
 // SERVER'S ADRESS IP NEEDS TO BE ADDED HERE
-IPAddress serverAddress(178, 192, 219, 78);
+IPAddress serverAddress();
 // SERVER'S PORT NEEDS TO BE ADDED HERE
-int port = 8080;
+int port = ;
 
 HttpClient httpClient(client, serverAddress, port);
 //--------------------------------------------------------------------------------------------------
 
 // Arduino's Ip should be always the same, it might change but the arduino usually has the same IP in access point mode
 String ipArduino = "http://192.168.4.1";
-// Wifi's Ip will change depending on the network
-String ipWifi = "http://192.168.183.146";
+// Wifi's Ip will change depending on the network. 
+// NEEDS TO BE ADDED HERE
+String ipWifi = "";
 
 void setup()
 {
@@ -134,6 +136,12 @@ void loop()
             digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
         }
     }
+
+    if((WiFi.status() != WL_CONNECTED) && !APMode)
+    {
+        connectedToWiFi = false;
+        connectToWiFi();
+    }
 }
 
 //--------------------------------------------WEB SERVER FUNCTIONS--------------------------------------------
@@ -166,6 +174,7 @@ void listNetworks(std::vector<const char *> &network)
  */
 void startAccessPoint()
 {
+    APMode = true;
     digitalWrite(LED_BUILTIN, HIGH);
     Serial.println("Starting Access Point...");
     WiFi.end();
@@ -270,6 +279,7 @@ void handleConfigRequest()
     if (ssidParam.length() > 0 && passParam.length() > 0 && sensorParam.length() > 0)
     {
         needsWiFiConfig = false;
+        APMode = false;
         connectToWiFi();
     }
     client.flush();
