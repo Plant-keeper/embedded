@@ -43,7 +43,13 @@ __2. Connecting to the Arduino:__ Connect your smartphone to the Arduino’s WiF
 
 __3. Configuring WiFi Settings:__ On the configuration page, input your WiFi network credentials (SSID and password) and the Arduino’s ID. A webpage will be displayed informing you that the arduino is connecting to the WiFi. If the connection fails, the Arduino will revert to Access Point mode and you need to re-enter the WiFi credentials on the configuration page.
 
-__4. Sending Data to the Server:__ Once connected to your WiFi network, the Arduino will begin sending sensor data to the server every 5 minutes. The current sensor data can also be viewed by navigating to the Arduino's new IP address, which is displayed in the serial monitor. This address should also be updated in the `ipWifi` variable.
+__4. Sending Data to the Server:__ Once connected to your WiFi network, the Arduino will begin sending sensor data to the server every 5 minutes.
+
+__5. Viewing Data and changing the wifi:__ 
+Once your Arduino is connected to a Wi-Fi network, you can view the sensor data being sent to the server. The data is accessible via the new IP address provided after the connection, which is displayed in the serial monitor.This address should also be updated in the `ipWifi` variable.
+To view the data, simply access this IP address from a web browser. 
+ 
+ Additionally, if you need to change the Wi-Fi network, you can reconnect to the Arduino's Access Point mode by pressing the button displayed below the datas. Once back in Access Point mode, you can visit the default configuration page (usually at 192.168.4.1) to enter new Wi-Fi credentials and reconnect the device.
 
 #### Status Indicators
 

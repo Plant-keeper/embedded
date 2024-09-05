@@ -438,7 +438,7 @@ void readSensors()
     int tmpLight;
 
     sensorDatas.soilHumidity = analogRead(0);
-    sensorDatas.temperature = dht.readTemperature();
+    sensorDatas.temperature = roundf(dht.readTemperature() * 100) / 100;
     tmpLight = SI1145.ReadVisible();
 
     // Map sensor values to have a percentage
@@ -462,8 +462,7 @@ void readSensors()
     // Create JSON object
     doc["id"] = sensorDatas.sensorId;
     doc["temperature"] = sensorDatas.temperature;
-    doc["humidity"] = sensorDatas.soilHumidity;
-    doc["humidityPercentage"] = sensorDatas.percentage;
+    doc["humidity"] = sensorDatas.percentage;
     doc["light"] = sensorDatas.light;
 }
 

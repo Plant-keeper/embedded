@@ -169,7 +169,7 @@ String generateDataPage(String IP, sensorData data) {
     <p>Click on the button below to change the WiFi configuration:</p>
    
     <form id="reconfigForm" action="/reconfigure" method="post">
-        <button type="button" onClick="submitFormAndRedirect()">Changer la configuration Wi-Fi</button>
+        <button type="button" onclick="submitFormAndRedirect()">Changer la configuration Wi-Fi</button>
     </form>
 
     <script>
@@ -179,10 +179,7 @@ String generateDataPage(String IP, sensorData data) {
             
             // Wait a moment before redirecting to allow form submission
             setTimeout(function() {
-                window.location.href = ')rawliteral";
-            webpage += IP;   
-            webpage+= R"rawliteral(
-             ';}, 3000); // Adjust the timeout as necessary
+                window.location.href = ')rawliteral" + IP + R"rawliteral(';}, 3000); // Adjust the timeout as necessary
         }
     </script>
 
