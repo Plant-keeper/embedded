@@ -54,6 +54,25 @@ __4. Sending Data to the Server:__ Once connected to your WiFi network, the Ardu
 
 > **_Note:_** The Arduino ID is provided by the backend when you register a plant on the website.
 
+## Simulating the Arduino (Without Hardware)
+
+If you don’t have access to an Arduino board or the required sensors, you can still simulate the project’s functionality by running a Python script that mimics the Arduino's behavior. This simulation will send data to the server every 5 minutes.
+
+__Steps to Run the Simulation:__
+
+__1. Open the Simulation Script:__
+- Navigate to the `fakeArduino.py` file located in the [simulateArduino](src/simulateArduino/fakeArduino.py) folder.
+
+__2. Set Server Configuration:__
+- In the Python script, update the server IP address and port to match your server’s configuration.
+
+__3. Run the Script:__
+ - Execute the script in your terminal using the following command:
+    `python3 fakeArduino.py`
+
+This will simulate the behavior of the Arduino, allowing you to see how the data is handled by the server without needing the actual hardware.
+
+
 ## Technical choices
 
 In __PlantKeeper__, we designed the iot system to collect and transmit sensor data that monitors environmental
@@ -128,24 +147,43 @@ needs of plant monitoring.
 
 ## Improvements and Future Work
 
+In this section, we outline several unresolved issues and potential areas for further improvement in the project. These are aspects that could be enhanced by contributors who are interested in advancing the project further. The following are the key areas:
+
+1. Wi-Fi Networks Scan Functionality
+    
+    - __Issue:__ The function responsible for scanning and listing nearby Wi-Fi networks cannot be used multiple times across the project. This is because it consumes too much time, blocking other processes in the code. We weren't able to find the root cause of this issue.
+
+2. Timeout and Blocking During Data Transmission
+
+    - __Issue:__ When sending data via a POST request, if there is no response from the server, the process blocks the rest of the loop. The default timeout or error (-3) handling takes too long, affecting the overall performance of the Arduino.
+
+3. Static IP Address or DNS Resolution
+
+    - __Issue:__ Currently, the Arduino IP address is not static and can only be determined via the serial monitor, making it difficult to manage network configurations.
+     - __Improvement:__ Implementing a static IP address or using a DNS service for the Arduino would improve network configuration management and user experience by allowing easier access to the Arduino without having to check the serial monitor for its IP address.
+
+4. DNS Library for Configuration Page
+
+    - __Issue:__ A DNS library could help implement a captive portal that automatically redirects users to a configuration page when they connect to the Arduino’s Wi-Fi.
+    - __Improvement:__ This would enable users to configure their Wi-Fi settings effortlessly without needing to manually enter a specific IP address. Using an ESP board (or a Raspberry Pi) could be an effective solution, as it is better equipped to handle DNS servers and captive portals.
 
 
+5. EEPROM Library Limitations in PlatformIO
 
+    - __Issue:__ The official EEPROM library required for saving Wi-Fi credentials and the Arduino ID is currently non-functional in PlatformIO. Alternative libraries were tested, but they either didn't work or caused additional issues, with one case even resulting in the Arduino becoming unreadable via the USB port
+    - __Improvement:__ Solving this issue would allow credentials to be saved, enabling the device to automatically reconnect to known networks after power cycles. Switching to a different EEPROM library or finding a workaround in PlatformIO could help resolve this.
 
-## Simulating the Arduino (Without Hardware)
+6. State Machine Implementation for the Loop
 
-If you don’t have access to an Arduino board or the required sensors, you can still simulate the project’s functionality by running a Python script that mimics the Arduino's behavior. This simulation will send data to the server every 5 minutes.
+    - __Improvement:__ Implementing a state machine design would make the code easier to read, maintain, and extend. Each state could handle specific tasks such as Wi-Fi configuration, data sending, or handling errors, leading to a more modular design.
 
-__Steps to Run the Simulation:__
+7. POST Request to Backend and SSL Issues
 
-__1. Open the Simulation Script:__
-- Navigate to the fakeArduino.py file located in the simulateArduino folder.
+    - __Issue:__ POST requests to the backend do not work due to SSL/TLS requirements and library limitations on the Arduino.
+    - __Improvement:__ This is a critical issue preventing the project from communicating securely with the backend.
+    The current solution is to use a proxy server to handle the communication, but a direct connection would be more efficient and secure. 
 
-__2. Set Server Configuration:__
-- In the Python script, update the server IP address and port to match your server’s configuration.
+8. Sensor Limitations and Calibration
 
-__3. Run the Script:__
- - Execute the script in your terminal using the following command:
-    `python3 fakeArduino.py`
-
-This will simulate the behavior of the Arduino, allowing you to see how the data is handled by the server without needing the actual hardware.
+    - __Issue:__ The soil moisture sensor, which is supposed to provide values between 0 and 1023, rarely measures below 700. Similarly, the light sensor returns values mostly between 160 and 800 lumens, rather than a broader range.
+    - __Improvement:__ Although the sensors function correctly, they may not be the most accurate for this use case. To meet the requirements of the database and display accurate data on the front-end, we had to use the map function to scale the sensor values to the desired ranges. Further calibration or alternative sensors could improve the accuracy of these measurements.
