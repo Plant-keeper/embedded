@@ -11,13 +11,19 @@
  *   - Eva Ray
  *   - Quentin Surdez
  *   - Rachel Tranchida
+ * @brief Webpages to be rendered by the arduino
+ *
  */
 
 #ifndef WEBPAGES_H
 #define WEBPAGES_H
 #include "sensorData.h"
 
-
+/**
+ * @brief Generates the configuration page to connect to a WiFi network
+ * @param networks The list of available networks
+ * @param passwordFailed Whether the password entered was incorrect
+ */
 String generateConfigPage(std::vector<const char *> networks, bool passwordFailed)
 {     
     String webpage = R"rawliteral(
@@ -81,9 +87,14 @@ String generateConfigPage(std::vector<const char *> networks, bool passwordFaile
     return webpage;
 }
 
-String generateSuccessPage()
+/**
+ * @brief Generates the connecting page to be displayed while the arduino is connecting to the WiFi network
+ * @param IP The IP address of the arduino
+ */
+String generateConnectingPage(String IP)
 {
     String webpage = R"rawliteral(
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -104,14 +115,20 @@ String generateSuccessPage()
     <h1>Your sensor is connecting!</h1>
     <p>The device is now connecting to the specified WiFi network. If you cannot access to your datas
     then you might have entered an incorect password. Check the previous ip page and reconnect to the wifi in that case </p>
-    <p> To access to your datas, click on this link <a href="http://192.168.183.146"> datas </a>   </p>
+    <p> To access to your datas, click on this link <a href=" )rawliteral";
+    webpage += IP ;
+    webpage += R"rawliteral( "> datas </a>   </p>
 </body>
 </html>
 )rawliteral";
     return webpage;
 }
 
-
+/**
+ * @brief Generates the data page to display the sensor data
+ * @param IP The IP address of the arduino
+ * @param data The sensor datas to be displayed
+ */
 String generateDataPage(String IP, sensorData data) {
     String webpage = R"rawliteral(
 <!DOCTYPE html>
@@ -129,25 +146,27 @@ String generateDataPage(String IP, sensorData data) {
             text-align: center;
         }
 
-        input[type="submit"] {
-        background-color: #4CAF50;
-        color: white;
-        cursor: pointer;
+        button {
+            width: 50%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            border: none;
+            background-color: #4CAF50;
+            color: white;
+            cursor: pointer;
+        }
     }
 
 </style>
 <body>
-    <h1>Hello, Plant!</h1>
-    <p>Current Temperature: )rawliteral";
-    webpage += String(data.temperature) + " &deg;C</p>";
-    webpage += "<p>Current Humidity: " + String(data.airHumidity) + " %</p>";
-    webpage += "<p> Value 1: " + String(data.soilHumidity) + "</p>";
-    webpage += "<p>Soil Moisture 1: " + String(data.percentage) + " %</p>";
-    webpage += "<p>Visible Light: " + String(data.visible) + "</p>";
-    webpage += "<p>Infra Light: " + String(data.IR) + "</p>";
-    webpage += "<p>UV Light: " + String(data.UV) + "</p>";
+    <h1>Hello, Plant!</h1> )rawliteral";
+    webpage += "<p>Your sensor id: " + String(data.sensorId) + "</p>";
+    webpage += "<p>Current Temperature: " + String(data.temperature) + " &deg;C</p>";
+    webpage += "<p >Humidity percentage: " + String(data.percentage) + " %</p>";
+    webpage += "<p>Visible Light: " + String(data.light) + "</p>";
     webpage += R"rawliteral(
-    <p>Click here on the button below to change the WiFi configuration:</p>
+    <p>Click on the button below to change the WiFi configuration:</p>
    
     <form id="reconfigForm" action="/reconfigure" method="post">
         <button type="button" onClick="submitFormAndRedirect()">Changer la configuration Wi-Fi</button>
@@ -160,8 +179,10 @@ String generateDataPage(String IP, sensorData data) {
             
             // Wait a moment before redirecting to allow form submission
             setTimeout(function() {
-                window.location.href = 'http://192.168.4.1';
-            }, 3000); // Adjust the timeout as necessary
+                window.location.href = ')rawliteral";
+            webpage += IP;   
+            webpage+= R"rawliteral(
+             ';}, 3000); // Adjust the timeout as necessary
         }
     </script>
 
