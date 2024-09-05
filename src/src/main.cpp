@@ -280,8 +280,8 @@ void handleConfigRequest()
  * @brief Function to connect to the Wi-Fi network using the credentials provided by the user.
  */
 void connectToWiFi()
-{   
-    // The counter is to make sure we cannot connect to the wifi since sometimes 
+{
+    // The counter is to make sure we cannot connect to the wifi since sometimes
     // the connection is not established the first time but the second time it works
     int counter = 0;
     WiFi.end();
@@ -375,7 +375,7 @@ void printWEB()
                     }
                 }
                 else if (c != '\r')
-                {                    
+                {
                     currentLine += c;
                 }
             }
@@ -395,7 +395,7 @@ void sendSensorData()
     readSensors();
     String jsonData;
     serializeJson(doc, jsonData);
-    
+
     httpClient.setHttpResponseTimeout(2000);
 
     // Send HTTP POST request
@@ -426,7 +426,7 @@ void sendSensorData()
 void readSensors()
 {
     int tmpLight;
-   
+
     sensorDatas.soilHumidity = analogRead(0);
     sensorDatas.temperature = dht.readTemperature();
     tmpLight = SI1145.ReadVisible();
